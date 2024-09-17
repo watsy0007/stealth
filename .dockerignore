@@ -1,0 +1,70 @@
+# flyctl launch added from .elixir_ls/.gitignore
+.elixir_ls/**/*
+
+# flyctl launch added from .gitignore
+# The directory Mix will write compiled artifacts to.
+_build
+
+# If you run "mix test --cover", coverage assets end up here.
+cover
+
+# The directory Mix downloads your dependencies sources to.
+deps
+
+# Where third-party dependencies like ExDoc output generated docs.
+doc
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+**/erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+**/*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+**/stealth-*.tar
+
+# Temporary files, for example, from tests.
+tmp
+
+**/.elixir_ls
+
+# flyctl launch added from deps/blake3/.gitignore
+# The directory Mix will write compiled artifacts to.
+deps/blake3/_build
+
+# The directory that rustler will write compiled artifacts to.
+deps/blake3/priv
+
+# rust build dir.
+deps/blake3/native/blake3/target
+
+# If you run "mix test --cover", coverage assets end up here.
+deps/blake3/cover
+
+# The directory Mix downloads your dependencies sources to.
+deps/blake3/deps
+
+# Where third-party dependencies like ExDoc output generated docs.
+deps/blake3/doc
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+deps/blake3/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+deps/blake3/**/erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+deps/blake3/**/*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+deps/blake3/**/blake3-*.tar
+
+
+# flyctl launch added from deps/rustler/priv/templates/basic/.gitignore
+deps/rustler/priv/templates/basic/target
+
+# flyctl
+fly.toml
