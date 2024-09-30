@@ -44,7 +44,7 @@ defmodule Stealth.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:cachex, "~> 3.6"}
+      {:cachex, "~> 4.0"}
     ]
   end
 end
