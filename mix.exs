@@ -7,7 +7,7 @@ defmodule Stealth.MixProject do
     [
       app: :stealth,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       build_embedded: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -44,7 +44,8 @@ defmodule Stealth.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:cachex, "~> 4.0"}
+      {:cachex, "~> 4.0"},
+      {:thousand_island, "~> 1.3"}
     ]
   end
 end
