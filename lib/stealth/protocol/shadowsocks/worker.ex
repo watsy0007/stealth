@@ -1,10 +1,12 @@
-defmodule Stealth.Protocols.Shadowsocks.Worker do
+defmodule Stealth.Protocol.Shadowsocks.Worker do
   require Logger
-  alias Stealth.Protocols.Shadowsocks.Protocol
-  alias Stealth.Cipher
+  alias Stealth.Protocol.Shadowsocks.Protocol
+  alias Stealth.Protocol.Shadowsocks.Cipher
   alias Stealth.Conn
 
-  def accept(port, cipher) do
+  def start(port, method, passwd) do
+    {:ok, cipher} = Cipher.setup(method, passwd)
+
     {:ok, socket} =
       :gen_tcp.listen(port, [
         :binary,
@@ -68,7 +70,7 @@ defmodule Stealth.Protocols.Shadowsocks.Worker do
     with {:ok, iv, payload} = Protocol.split_iv(data, iv_len),
          {:ok, cipher} = Cipher.init_decoder(cipher, iv),
          {:ok, cipher, data} = Cipher.stream_decode(cipher, payload),
-         {:ok, req} <- Protocol.parse_shadowsocks_request(data),
+         {:ok, req} <- Conn.parse_socks5_request(data),
          {:ok, req} <- Conn.resolve_remote_address(req),
          {:ok, req} <- Conn.filter_forbidden_addresses(req),
          {:ok, req} = Conn.tcp_connect_remote(req),

@@ -17,6 +17,25 @@ defmodule Stealth.Conn do
   # how many times will each remote be tried?
   @tcp_retry 2
 
+  def parse_socks5_request(data) do
+    case data do
+      # IP4
+      <<1, addr::bytes-4, port::16, payload::bytes>> ->
+        {:ok, %{req_type: :ip4, addr: addr, port: port, payload: payload}}
+
+      # host
+      <<3, len, addr::bytes-size(len), port::16, payload::bytes>> ->
+        {:ok, %{req_type: :host, addr: addr, port: port, payload: payload}}
+
+      # IP6
+      <<4, addr::bytes-16, port::16, payload::bytes>> ->
+        {:ok, %{req_type: :ip6, addr: addr, port: port, payload: payload}}
+
+      _ ->
+        {:error, :invalid_request}
+    end
+  end
+
   def resolve_remote_address(%{req_type: :host, addr: addr} = req) do
     case DNSCache.fetch(addr) do
       {:ok, ip} ->

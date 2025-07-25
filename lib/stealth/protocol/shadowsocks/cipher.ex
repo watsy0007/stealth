@@ -1,11 +1,10 @@
-defmodule Stealth.Cipher do
+defmodule Stealth.Protocol.Shadowsocks.Cipher do
   @type method :: atom()
   @type ctx :: tuple()
   @type t :: %__MODULE__{}
 
   require Logger
-  alias Stealth.Cipher
-  alias Stealth.HKDF
+  alias Stealth.Protocol.Shadowsocks.HKDF
 
   defstruct method: nil, key: nil, encoder: nil, decoder: nil, key_len: 0, iv_len: 0
 
@@ -32,14 +31,14 @@ defmodule Stealth.Cipher do
   end
 
   @spec init_encoder(t()) :: {:ok, t(), binary()}
-  def init_encoder(%Cipher{key: key, iv_len: iv_len} = c) do
+  def init_encoder(%__MODULE__{key: key, iv_len: iv_len} = c) do
     salt = :crypto.strong_rand_bytes(iv_len)
     sub_key = compute_sub_key(key, salt)
     {:ok, %{c | encoder: {sub_key, 0}}, salt}
   end
 
   @spec init_decoder(t(), binary()) :: {:ok, t()}
-  def init_decoder(%Cipher{key: key} = c, salt) do
+  def init_decoder(%__MODULE__{key: key} = c, salt) do
     sub_key = compute_sub_key(key, salt)
     {:ok, %{c | decoder: {sub_key, 0}}}
   end
@@ -60,7 +59,7 @@ defmodule Stealth.Cipher do
 
   def stream_decode(c, ""), do: {:ok, c, ""}
 
-  def stream_decode(%Cipher{decoder: {key, nonce, buf}} = c, data) do
+  def stream_decode(%__MODULE__{decoder: {key, nonce, buf}} = c, data) do
     stream_decode(%{c | decoder: {key, nonce}}, buf <> data)
   end
 
@@ -90,18 +89,18 @@ defmodule Stealth.Cipher do
     end
   end
 
-  def stream_decode(%Cipher{decoder: {key, nonce}} = c, data) do
+  def stream_decode(%__MODULE__{decoder: {key, nonce}} = c, data) do
     {:ok, %{c | decoder: {key, nonce, data}}, ""}
   end
 
   @spec encode(t(), String.t()) :: {:ok, t(), binary()}
-  def encode(%Cipher{encoder: {key, nonce}, method: method} = c, data) do
+  def encode(%__MODULE__{encoder: {key, nonce}, method: method} = c, data) do
     {res, tag} = :crypto.crypto_one_time_aead(method, key, <<nonce::little-96>>, data, <<>>, true)
     {:ok, %{c | encoder: {key, nonce + 1}}, res <> tag}
   end
 
   @spec decode(t(), binary()) :: {:ok, t(), binary()} | {:error, :forged}
-  def decode(%Cipher{decoder: {key, nonce}, method: method} = c, data) do
+  def decode(%__MODULE__{decoder: {key, nonce}, method: method} = c, data) do
     payload_len = byte_size(data) - 16
     {payload, tag} = :erlang.split_binary(data, payload_len)
 

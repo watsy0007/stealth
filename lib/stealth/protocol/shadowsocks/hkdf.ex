@@ -1,4 +1,4 @@
-defmodule Stealth.HKDF do
+defmodule Stealth.Protocol.Shadowsocks.HKDF do
   @moduledoc """
   Provides a simple Hashed Message Authetication Code (HMAC)-based
   key derivation function (HKDF)

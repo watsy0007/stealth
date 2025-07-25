@@ -1,7 +1,8 @@
-defmodule Stealth.CiperStreamTest do
+defmodule Stealth.Procotol.Shadowsocks.CiperStreamTest do
   use ExUnit.Case, async: true
+  doctest Stealth.Protocol.Shadowsocks.Cipher
   require Logger
-  alias Stealth.Cipher
+  alias Stealth.Protocol.Shadowsocks.Cipher
 
   @passwd "foQuC36lejke0X0FkHBbVAJAWiZlGtFO5vKhiduv+is="
   @data "Something needs to be encrypted"
