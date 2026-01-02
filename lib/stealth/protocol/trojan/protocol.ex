@@ -4,17 +4,14 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   The Trojan protocol uses TLS as transport layer encryption and SHA-224 for password authentication.
   Protocol format: SHA-224(password) + CRLF + SOCKS5 address + payload
+
+  This module delegates SOCKS5 address building to `Stealth.Conn` for code reuse.
   """
 
   require Logger
   alias Stealth.Conn
 
   @crlf "\r\n"
-  @cmd_connect 0x01
-  @cmd_udp_associate 0x03
-  @atyp_ipv4 0x01
-  @atyp_domain 0x03
-  @atyp_ipv6 0x04
 
   @doc """
   Compute SHA-224 hash of password in lowercase hexadecimal format.
@@ -76,6 +73,8 @@ defmodule Stealth.Protocol.Trojan.Protocol do
   @doc """
   Build SOCKS5 address format.
 
+  Delegates to `Stealth.Conn.build_socks5_address/3` for code reuse.
+
   ## Parameters
     - address: IP tuple {a, b, c, d}, IPv6 tuple, domain string, or address map
     - port: Port number
@@ -89,50 +88,7 @@ defmodule Stealth.Protocol.Trojan.Protocol do
       iex> Protocol.build_socks5_address("example.com", 443)
       {:ok, <<1, 3, 11, "example.com", 1, 187>>}
   """
-  def build_socks5_address(address, port, cmd \\ :connect)
-
-  # IPv4 address
-  def build_socks5_address({a, b, c, d}, port, cmd)
-      when is_integer(a) and is_integer(b) and is_integer(c) and is_integer(d) and
-             is_integer(port) and port >= 0 and port <= 65535 do
-    cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
-    {:ok, <<cmd_byte, @atyp_ipv4, a, b, c, d, port::16>>}
-  end
-
-  # IPv6 address
-  def build_socks5_address({a, b, c, d, e, f, g, h}, port, cmd)
-      when is_integer(port) and port >= 0 and port <= 65535 do
-    cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
-    {:ok, <<cmd_byte, @atyp_ipv6, a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16, port::16>>}
-  end
-
-  # Domain name
-  def build_socks5_address(domain, port, cmd)
-      when is_binary(domain) and is_integer(port) and port >= 0 and port <= 65535 do
-    domain_len = byte_size(domain)
-
-    if domain_len > 255 do
-      {:error, :domain_too_long}
-    else
-      cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
-      {:ok, <<cmd_byte, @atyp_domain, domain_len, domain::binary, port::16>>}
-    end
-  end
-
-  # Address map (from parsed request)
-  def build_socks5_address(%{req_type: :ipv4, ip: ip, port: port}, _port_override, cmd) do
-    build_socks5_address(ip, port, cmd)
-  end
-
-  def build_socks5_address(%{req_type: :ipv6, ip: ip, port: port}, _port_override, cmd) do
-    build_socks5_address(ip, port, cmd)
-  end
-
-  def build_socks5_address(%{req_type: :host, addr: addr, port: port}, _port_override, cmd) do
-    build_socks5_address(addr, port, cmd)
-  end
-
-  def build_socks5_address(_, _, _), do: {:error, :invalid_address}
+  defdelegate build_socks5_address(address, port, cmd \\ :connect), to: Conn
 
   @doc """
   Validate password hash.
@@ -174,17 +130,17 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   @doc """
   Get command name from command byte.
+
+  Delegates to `Stealth.Conn.byte_to_command/1` for code reuse.
   """
-  def command_name(@cmd_connect), do: :connect
-  def command_name(@cmd_udp_associate), do: :udp_associate
-  def command_name(_), do: :unknown
+  defdelegate command_name(byte), to: Conn, as: :byte_to_command
 
   @doc """
   Get command byte from command name.
+
+  Delegates to `Stealth.Conn.command_to_byte/1` for code reuse.
   """
-  def command_byte(:connect), do: @cmd_connect
-  def command_byte(:udp_associate), do: @cmd_udp_associate
-  def command_byte(_), do: nil
+  defdelegate command_byte(name), to: Conn, as: :command_to_byte
 
   # Private functions
 
