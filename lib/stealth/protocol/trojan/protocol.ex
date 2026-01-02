@@ -1,13 +1,39 @@
 defmodule Stealth.Protocol.Trojan.Protocol do
+  @moduledoc """
+  Trojan protocol implementation with SSL/TLS encryption.
+
+  The Trojan protocol uses TLS as transport layer encryption and SHA-224 for password authentication.
+  Protocol format: SHA-224(password) + CRLF + SOCKS5 address + payload
+  """
+
   require Logger
   alias Stealth.Conn
-  @crlf "\r\n"
 
+  @crlf "\r\n"
+  @cmd_connect 0x01
+  @cmd_udp_associate 0x03
+  @atyp_ipv4 0x01
+  @atyp_domain 0x03
+  @atyp_ipv6 0x04
+
+  @doc """
+  Compute SHA-224 hash of password in lowercase hexadecimal format.
+
+  ## Examples
+
+      iex> Stealth.Protocol.Trojan.Protocol.sha224_hash("password")
+      "d63dc919e201d7bc4c825630d2cf25fdc93d4b2f0d46706d29038d01"
+  """
   def sha224_hash(passwd) do
     :crypto.hash(:sha224, passwd)
     |> Base.encode16(case: :lower)
   end
 
+  @doc """
+  Parse Trojan request from socket.
+
+  Reads and validates the password hash, then parses the SOCKS5 address.
+  """
   def parse_request(socket, passwd) do
     with {:ok, data} <- read_initial_data(socket),
          {:ok, %{payload: payload} = req} <- parse_protocol(data, passwd) do
@@ -20,6 +46,147 @@ defmodule Stealth.Protocol.Trojan.Protocol do
       error -> error
     end
   end
+
+  @doc """
+  Build a complete Trojan request packet.
+
+  ## Parameters
+    - password: Plain text password
+    - address: Target address (IP tuple, domain string, or address map)
+    - port: Target port
+    - payload: Optional initial payload data
+    - cmd: Command type (:connect or :udp_associate), default :connect
+
+  ## Examples
+
+      iex> Protocol.build_request("mypass", {192, 168, 1, 1}, 80)
+      {:ok, <<...>>}
+
+      iex> Protocol.build_request("mypass", "example.com", 443, "GET / HTTP/1.1\\r\\n")
+      {:ok, <<...>>}
+  """
+  def build_request(password, address, port, payload \\ "", cmd \\ :connect) do
+    with {:ok, hash} <- {:ok, sha224_hash(password)},
+         {:ok, socks5_addr} <- build_socks5_address(address, port, cmd) do
+      request = hash <> @crlf <> socks5_addr <> @crlf <> payload
+      {:ok, request}
+    end
+  end
+
+  @doc """
+  Build SOCKS5 address format.
+
+  ## Parameters
+    - address: IP tuple {a, b, c, d}, IPv6 tuple, domain string, or address map
+    - port: Port number
+    - cmd: Command type (:connect or :udp_associate)
+
+  ## Examples
+
+      iex> Protocol.build_socks5_address({192, 168, 1, 1}, 80)
+      {:ok, <<1, 1, 192, 168, 1, 1, 0, 80>>}
+
+      iex> Protocol.build_socks5_address("example.com", 443)
+      {:ok, <<1, 3, 11, "example.com", 1, 187>>}
+  """
+  def build_socks5_address(address, port, cmd \\ :connect)
+
+  # IPv4 address
+  def build_socks5_address({a, b, c, d}, port, cmd)
+      when is_integer(a) and is_integer(b) and is_integer(c) and is_integer(d) and
+             is_integer(port) and port >= 0 and port <= 65535 do
+    cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
+    {:ok, <<cmd_byte, @atyp_ipv4, a, b, c, d, port::16>>}
+  end
+
+  # IPv6 address
+  def build_socks5_address({a, b, c, d, e, f, g, h}, port, cmd)
+      when is_integer(port) and port >= 0 and port <= 65535 do
+    cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
+    {:ok, <<cmd_byte, @atyp_ipv6, a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16, port::16>>}
+  end
+
+  # Domain name
+  def build_socks5_address(domain, port, cmd)
+      when is_binary(domain) and is_integer(port) and port >= 0 and port <= 65535 do
+    domain_len = byte_size(domain)
+
+    if domain_len > 255 do
+      {:error, :domain_too_long}
+    else
+      cmd_byte = if cmd == :udp_associate, do: @cmd_udp_associate, else: @cmd_connect
+      {:ok, <<cmd_byte, @atyp_domain, domain_len, domain::binary, port::16>>}
+    end
+  end
+
+  # Address map (from parsed request)
+  def build_socks5_address(%{req_type: :ipv4, ip: ip, port: port}, _port_override, cmd) do
+    build_socks5_address(ip, port, cmd)
+  end
+
+  def build_socks5_address(%{req_type: :ipv6, ip: ip, port: port}, _port_override, cmd) do
+    build_socks5_address(ip, port, cmd)
+  end
+
+  def build_socks5_address(%{req_type: :host, addr: addr, port: port}, _port_override, cmd) do
+    build_socks5_address(addr, port, cmd)
+  end
+
+  def build_socks5_address(_, _, _), do: {:error, :invalid_address}
+
+  @doc """
+  Validate password hash.
+
+  ## Examples
+
+      iex> hash = Protocol.sha224_hash("password")
+      iex> Protocol.validate_password(hash, "password")
+      true
+
+      iex> Protocol.validate_password("invalid", "password")
+      false
+  """
+  def validate_password(hash, password) do
+    expected_hash = sha224_hash(password)
+    hash == expected_hash
+  end
+
+  @doc """
+  Extract password hash from request data.
+
+  ## Examples
+
+      iex> request = Protocol.sha224_hash("pass") <> "\\r\\n" <> "data"
+      iex> Protocol.extract_password_hash(request)
+      {:ok, hash, remaining_data}
+  """
+  def extract_password_hash(data) when byte_size(data) >= 58 do
+    case data do
+      <<hash::binary-size(56), @crlf, rest::binary>> ->
+        {:ok, hash, rest}
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  def extract_password_hash(_), do: {:error, :insufficient_data}
+
+  @doc """
+  Get command name from command byte.
+  """
+  def command_name(@cmd_connect), do: :connect
+  def command_name(@cmd_udp_associate), do: :udp_associate
+  def command_name(_), do: :unknown
+
+  @doc """
+  Get command byte from command name.
+  """
+  def command_byte(:connect), do: @cmd_connect
+  def command_byte(:udp_associate), do: @cmd_udp_associate
+  def command_byte(_), do: nil
+
+  # Private functions
 
   defp read_initial_data(socket) do
     # 读取足够的数据来解析协议头

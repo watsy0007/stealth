@@ -48,6 +48,135 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
     end
   end
 
+  describe "build_request/5" do
+    test "builds valid IPv4 request" do
+      {:ok, request} = Protocol.build_request("password", {192, 168, 1, 1}, 80)
+
+      assert is_binary(request)
+      # 验证包含密码哈希
+      assert String.starts_with?(request, Protocol.sha224_hash("password"))
+      # 验证包含 CRLF
+      assert String.contains?(request, "\r\n")
+    end
+
+    test "builds valid domain request" do
+      {:ok, request} = Protocol.build_request("password", "example.com", 443)
+
+      assert is_binary(request)
+      hash = Protocol.sha224_hash("password")
+      assert String.starts_with?(request, hash)
+    end
+
+    test "builds request with payload" do
+      payload = "GET / HTTP/1.1\r\n\r\n"
+      {:ok, request} = Protocol.build_request("password", "example.com", 80, payload)
+
+      assert String.ends_with?(request, payload)
+    end
+
+    test "builds request with UDP associate command" do
+      {:ok, request} = Protocol.build_request("password", {8, 8, 8, 8}, 53, "", :udp_associate)
+
+      assert is_binary(request)
+      # 验证命令字节是 0x03
+      hash = Protocol.sha224_hash("password")
+      <<^hash::binary-size(56), "\r\n", 0x03, _rest::binary>> = request
+    end
+  end
+
+  describe "build_socks5_address/3" do
+    test "builds IPv4 address" do
+      {:ok, addr} = Protocol.build_socks5_address({192, 168, 1, 1}, 80)
+
+      assert addr == <<0x01, 0x01, 192, 168, 1, 1, 0, 80>>
+    end
+
+    test "builds IPv6 address" do
+      {:ok, addr} = Protocol.build_socks5_address({0x2001, 0x0DB8, 0, 0, 0, 0, 0, 1}, 443)
+
+      assert <<0x01, 0x04, _rest::binary>> = addr
+      assert byte_size(addr) == 20
+    end
+
+    test "builds domain address" do
+      {:ok, addr} = Protocol.build_socks5_address("example.com", 443)
+
+      assert <<0x01, 0x03, 11, "example.com", 1, 187>> = addr
+    end
+
+    test "rejects domain longer than 255 bytes" do
+      long_domain = String.duplicate("a", 256)
+      assert {:error, :domain_too_long} = Protocol.build_socks5_address(long_domain, 80)
+    end
+
+    test "builds address with UDP associate command" do
+      {:ok, addr} = Protocol.build_socks5_address({8, 8, 8, 8}, 53, :udp_associate)
+
+      assert <<0x03, 0x01, 8, 8, 8, 8, 0, 53>> = addr
+    end
+
+    test "builds address from parsed request map" do
+      req = %{req_type: :ipv4, ip: {127, 0, 0, 1}, port: 8080}
+      {:ok, addr} = Protocol.build_socks5_address(req, nil, :connect)
+
+      assert <<0x01, 0x01, 127, 0, 0, 1, 31, 144>> = addr
+    end
+
+    test "handles invalid address" do
+      assert {:error, :invalid_address} = Protocol.build_socks5_address(123, 80)
+    end
+  end
+
+  describe "validate_password/2" do
+    test "validates correct password" do
+      hash = Protocol.sha224_hash("correct_password")
+      assert Protocol.validate_password(hash, "correct_password")
+    end
+
+    test "rejects incorrect password" do
+      hash = Protocol.sha224_hash("correct_password")
+      refute Protocol.validate_password(hash, "wrong_password")
+    end
+
+    test "rejects malformed hash" do
+      refute Protocol.validate_password("invalid_hash", "password")
+    end
+  end
+
+  describe "extract_password_hash/1" do
+    test "extracts valid password hash" do
+      hash = Protocol.sha224_hash("password")
+      data = hash <> "\r\n" <> "remaining data"
+
+      assert {:ok, ^hash, "remaining data"} = Protocol.extract_password_hash(data)
+    end
+
+    test "handles insufficient data" do
+      short_data = "too short"
+      assert {:error, :insufficient_data} = Protocol.extract_password_hash(short_data)
+    end
+
+    test "handles invalid format" do
+      # 56 字节但没有 CRLF
+      invalid_data = String.duplicate("a", 56) <> "no crlf"
+      assert {:error, :invalid_format} = Protocol.extract_password_hash(invalid_data)
+    end
+  end
+
+  describe "command_name/1 and command_byte/1" do
+    test "converts command byte to name" do
+      assert Protocol.command_name(0x01) == :connect
+      assert Protocol.command_name(0x03) == :udp_associate
+      assert Protocol.command_name(0xFF) == :unknown
+    end
+
+    test "converts command name to byte" do
+      assert Protocol.command_byte(:connect) == 0x01
+      assert Protocol.command_byte(:udp_associate) == 0x03
+      assert Protocol.command_byte(:unknown) == nil
+    end
+  end
+
   describe "parse_request/2" do
     setup do
       # 创建一个模拟的 socket
