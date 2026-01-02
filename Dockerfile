@@ -1,4 +1,4 @@
-FROM elixir:1.18.4-otp-28-slim AS build
+FROM elixir:1.19.4-otp-28-slim AS build
 
 ENV MIX_ENV=prod
 
@@ -19,7 +19,7 @@ COPY . .
 
 RUN mix do compile, release
 
-FROM elixir:otp-27-slim AS app
+FROM elixir:otp-28-slim AS app
 
 WORKDIR /app
 ENV HOME=/app \

@@ -45,7 +45,10 @@ defmodule Stealth.MixProject do
   defp deps do
     [
       {:cachex, "~> 4.0"},
-      {:thousand_island, "~> 1.3"}
+      {:thousand_island, "~> 1.3"},
+      {:bandit, "~> 1.10"},
+      {:websock_adapter, "~> 0.5"},
+      {:plug, "~> 1.14"}
     ]
   end
 end
