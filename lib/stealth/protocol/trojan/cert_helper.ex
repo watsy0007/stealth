@@ -48,7 +48,9 @@ defmodule Stealth.Protocol.Trojan.CertHelper do
              "-nodes",
              "-subj",
              "/CN=localhost"
-           ], stderr_to_stdout: true) do
+           ],
+           stderr_to_stdout: true
+         ) do
       {_out, 0} ->
         Logger.info("Basic SSL certificate generated successfully.")
 
