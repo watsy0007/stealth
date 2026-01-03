@@ -56,11 +56,15 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
-      iex> Protocol.build_request("mypass", {192, 168, 1, 1}, 80)
-      {:ok, <<...>>}
+      iex> alias Stealth.Protocol.Trojan.Protocol
+      iex> {:ok, request} = Protocol.build_request("mypass", {192, 168, 1, 1}, 80)
+      iex> is_binary(request)
+      true
 
-      iex> Protocol.build_request("mypass", "example.com", 443, "GET / HTTP/1.1\\r\\n")
-      {:ok, <<...>>}
+      iex> alias Stealth.Protocol.Trojan.Protocol
+      iex> {:ok, request} = Protocol.build_request("mypass", "example.com", 443, "GET / HTTP/1.1\\r\\n")
+      iex> String.ends_with?(request, "GET / HTTP/1.1\\r\\n")
+      true
   """
   def build_request(password, address, port, payload \\ "", cmd \\ :connect) do
     with {:ok, hash} <- {:ok, sha224_hash(password)},
@@ -82,9 +86,11 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.build_socks5_address({192, 168, 1, 1}, 80)
       {:ok, <<1, 1, 192, 168, 1, 1, 0, 80>>}
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.build_socks5_address("example.com", 443)
       {:ok, <<1, 3, 11, "example.com", 1, 187>>}
   """
@@ -95,10 +101,12 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> hash = Protocol.sha224_hash("password")
       iex> Protocol.validate_password(hash, "password")
       true
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.validate_password("invalid", "password")
       false
   """
@@ -112,9 +120,14 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
-      iex> request = Protocol.sha224_hash("pass") <> "\\r\\n" <> "data"
-      iex> Protocol.extract_password_hash(request)
-      {:ok, hash, remaining_data}
+      iex> alias Stealth.Protocol.Trojan.Protocol
+      iex> hash = Protocol.sha224_hash("pass")
+      iex> request = hash <> "\\r\\n" <> "data"
+      iex> {:ok, extracted_hash, remaining} = Protocol.extract_password_hash(request)
+      iex> extracted_hash == hash
+      true
+      iex> remaining
+      "data"
   """
   def extract_password_hash(data) when byte_size(data) >= 58 do
     case data do
@@ -145,22 +158,50 @@ defmodule Stealth.Protocol.Trojan.Protocol do
   # Private functions
 
   defp read_initial_data(socket) do
-    # 读取足够的数据来解析协议头
-    # 最小长度：56(hash) + 2(CRLF) + 1(CMD) + 1(ATYP) + 1(addr_len) + 2(port) + 2(CRLF) = 65
-    case ThousandIsland.Socket.recv(socket, 65, 5000) do
-      {:ok, data} when byte_size(data) >= 65 ->
-        {:ok, data}
-
-      {:ok, data} ->
-        # 如果数据不足，尝试读取更多
-        case ThousandIsland.Socket.recv(socket, 100 - byte_size(data), 2000) do
-          {:ok, more_data} -> {:ok, data <> more_data}
-          error -> error
+    # Read hash + CRLF first (58 bytes) - use 3s timeout to allow Task.await to complete
+    with {:ok, hash_data} <- ThousandIsland.Socket.recv(socket, 58, 3000),
+         # Read CMD byte (1 byte)
+         {:ok, <<cmd>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         # Read ATYP byte (1 byte)
+         {:ok, <<atyp>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         # Read address based on ATYP
+         {:ok, addr_port_data} <- read_address_and_port(socket, atyp),
+         # Read trailing CRLF (2 bytes)
+         {:ok, @crlf} <- ThousandIsland.Socket.recv(socket, 2, 3000) do
+      # Try to read any payload data (recv 0 means read whatever is available)
+      payload =
+        case ThousandIsland.Socket.recv(socket, 0, 1000) do
+          {:ok, data} when byte_size(data) > 0 -> data
+          _ -> ""
         end
 
-      error ->
-        error
+      # Reconstruct the full data
+      socks5_addr = <<cmd, atyp>> <> addr_port_data
+      {:ok, hash_data <> socks5_addr <> @crlf <> payload}
     end
+  end
+
+  # Read address and port based on ATYP
+  defp read_address_and_port(socket, 0x01) do
+    # IPv4: 4 bytes address + 2 bytes port
+    ThousandIsland.Socket.recv(socket, 6, 3000)
+  end
+
+  defp read_address_and_port(socket, 0x03) do
+    # Domain: 1 byte length + N bytes domain + 2 bytes port
+    with {:ok, <<len>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         {:ok, domain_port} <- ThousandIsland.Socket.recv(socket, len + 2, 3000) do
+      {:ok, <<len>> <> domain_port}
+    end
+  end
+
+  defp read_address_and_port(socket, 0x04) do
+    # IPv6: 16 bytes address + 2 bytes port
+    ThousandIsland.Socket.recv(socket, 18, 3000)
+  end
+
+  defp read_address_and_port(_socket, _atyp) do
+    {:error, :invalid_atyp}
   end
 
   defp parse_protocol(data, passwd) do

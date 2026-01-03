@@ -9,6 +9,9 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
   @timeout 10_000
 
   setup_all do
+    # Start the DNS cache for domain resolution
+    start_supervised!(Stealth.DNSCache)
+
     {:ok, cert_info} = CertHelper.setup_test_certificates()
 
     cfg = [
@@ -22,7 +25,7 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
       handler_module: Worker,
       handler_options: [
         passwd: @test_password,
-        server: [host: "httpbin.org", port: 80]
+        server: [host: "localhost", port: 18080]
       ],
       num_acceptors: 5
     ]
@@ -30,10 +33,19 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
     Logger.info("Starting Trojan worker test server on port #{cfg[:port]}...")
 
     case ThousandIsland.start_link(cfg) do
-      {:ok, pid} ->
+      {:ok, server_pid} ->
         Logger.info("Trojan worker test server started successfully.")
-        on_exit(fn -> GenServer.stop(pid) end)
-        {:ok, server_pid: pid, cert_info: cert_info}
+
+        on_exit(fn ->
+          # Stop the server with a timeout
+          try do
+            GenServer.stop(server_pid, :normal, 5000)
+          catch
+            :exit, _ -> :ok
+          end
+        end)
+
+        {:ok, server_pid: server_pid, cert_info: cert_info}
 
       {:error, reason} ->
         Logger.error("Failed to start Trojan worker test server: #{inspect(reason)}")
@@ -124,15 +136,15 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
 
       # CONNECT
       # IPv4
-      # example.com IP
-      # Port 80
+      # localhost IP
+      # Port 18080
       request =
         hash <>
           "\r\n" <>
           <<0x01>> <>
           <<0x01>> <>
-          <<93, 184, 216, 34>> <>
-          <<0, 80>> <>
+          <<127, 0, 0, 1>> <>
+          <<18080::16>> <>
           "\r\n"
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -153,11 +165,11 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
         )
 
       hash = Protocol.sha224_hash(@test_password)
-      domain = "example.com"
+      domain = "localhost"
 
       # CONNECT
       # Domain
-      # Port 80
+      # Port 18080
       request =
         hash <>
           "\r\n" <>
@@ -165,7 +177,7 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
           <<0x03>> <>
           <<byte_size(domain)>> <>
           domain <>
-          <<0, 80>> <>
+          <<18080::16>> <>
           "\r\n"
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -185,18 +197,18 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
         )
 
       hash = Protocol.sha224_hash(@test_password)
-      http_request = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+      http_request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"
 
       # CONNECT
       # IPv4
-      # Port 80
+      # Port 18080
       request =
         hash <>
           "\r\n" <>
           <<0x01>> <>
           <<0x01>> <>
-          <<93, 184, 216, 34>> <>
-          <<0, 80>> <>
+          <<127, 0, 0, 1>> <>
+          <<18080::16>> <>
           "\r\n" <> http_request
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -267,8 +279,8 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
                 "\r\n" <>
                 <<0x01>> <>
                 <<0x01>> <>
-                <<93, 184, 216, 34>> <>
-                <<0, 80>> <>
+                <<127, 0, 0, 1>> <>
+                <<18080::16>> <>
                 "\r\n"
 
             :ssl.send(ssl_socket, request)
@@ -339,8 +351,8 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
           "\r\n" <>
           <<0x01>> <>
           <<0x01>> <>
-          <<93, 184, 216, 34>> <>
-          <<0, 80>> <>
+          <<127, 0, 0, 1>> <>
+          <<18080::16>> <>
           "\r\n" <> large_payload
 
       :ssl.send(ssl_socket, request)

@@ -4,6 +4,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
   require Logger
   alias Stealth.Protocol.Trojan.Protocol
 
+  # Mock span for testing
+  defmodule MockSpan do
+    defstruct span_name: :test_span, span_metadata: %{}
+
+    def span_metadata(%__MODULE__{}), do: %{}
+  end
+
   describe "sha224_hash/1" do
     test "generates correct hash length" do
       password = "test_password_123"
@@ -213,7 +220,15 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: %MockSpan{}
+          }
+
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -228,7 +243,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
 
       assert {:ok, req} = result
       assert req.req_type == :ipv4
-      assert req.ip == {93, 184, 216, 34}
+      assert req.addr == <<93, 184, 216, 34>>
       assert req.port == 80
 
       :gen_tcp.close(client_socket)
@@ -244,7 +259,15 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: %MockSpan{}
+          }
+
           result = Protocol.parse_request(wrapped_socket, wrong_password)
           :gen_tcp.close(socket)
           result
@@ -285,7 +308,15 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: %MockSpan{}
+          }
+
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -327,7 +358,15 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: %MockSpan{}
+          }
+
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -339,7 +378,8 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       result = Task.await(task, 5000)
 
       assert {:ok, req} = result
-      assert req.payload == payload
+      # Payload includes the trailing CRLF from the protocol
+      assert req.payload == "\r\n" <> payload
       assert byte_size(req.payload) > 0
 
       :gen_tcp.close(client_socket)
@@ -356,7 +396,15 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: %MockSpan{}
+          }
+
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result

@@ -33,8 +33,10 @@ defmodule Stealth.Protocol.Trojan.Client do
     with {:ok, ssl_socket} <- connect_to_server(server_host, server_port, opts),
          {:ok, request} <- build_trojan_request(password, target_host, target_port, opts),
          :ok <- send_handshake(ssl_socket, request) do
+      target_host_str = if is_tuple(target_host), do: inspect(target_host), else: target_host
+
       Logger.info(
-        "Trojan tunnel established: #{server_host}:#{server_port} -> #{target_host}:#{target_port}"
+        "Trojan tunnel established: #{server_host}:#{server_port} -> #{target_host_str}:#{target_port}"
       )
 
       {:ok, ssl_socket}
@@ -160,6 +162,12 @@ defmodule Stealth.Protocol.Trojan.Client do
     Crypto.ssl_send(socket, request)
   end
 
+  # Handle IP tuples directly
+  defp parse_ip(host) when is_tuple(host) do
+    {:ok, host}
+  end
+
+  # Parse string to IP tuple
   defp parse_ip(host) when is_binary(host) do
     charlist = String.to_charlist(host)
 
@@ -176,7 +184,8 @@ defmodule Stealth.Protocol.Trojan.Client do
       {"Connection", "close"}
     ]
 
-    all_headers = Keyword.merge(default_headers, headers)
+    # Merge headers (both are lists of tuples, not keyword lists)
+    all_headers = default_headers ++ headers
 
     header_lines =
       Enum.map(all_headers, fn {key, value} ->

@@ -109,6 +109,8 @@ defmodule Stealth.Protocol.Trojan.CertHelperTest do
 
     test "raises when certificate file is missing" do
       cert_dir = "priv/ssl"
+      # 清理并创建新目录
+      File.rm_rf(cert_dir)
       File.mkdir_p!(cert_dir)
 
       # 只创建 key 文件，不创建 cert 文件
@@ -125,6 +127,8 @@ defmodule Stealth.Protocol.Trojan.CertHelperTest do
 
     test "raises when key file is missing" do
       cert_dir = "priv/ssl"
+      # 清理并创建新目录
+      File.rm_rf(cert_dir)
       File.mkdir_p!(cert_dir)
 
       # 只创建 cert 文件，不创建 key 文件
@@ -146,14 +150,16 @@ defmodule Stealth.Protocol.Trojan.CertHelperTest do
 
       # 尝试使用 SSL 库加载证书
       cert_content = File.read!(cert_info.cert_file)
-      [cert_der | _] = :public_key.pem_decode(cert_content)
-      decoded_cert = :public_key.pem_entry_decode(cert_der)
+      [cert_pem_entry | _] = :public_key.pem_decode(cert_content)
+
+      # Extract DER binary from PEM entry
+      cert_der_binary = elem(cert_pem_entry, 1)
+
+      # Decode the DER binary to OTP certificate format
+      otp_cert = :public_key.pkix_decode_cert(cert_der_binary, :otp)
 
       # 验证证书结构
-      assert elem(decoded_cert, 0) == :Certificate
-
-      # 验证证书包含主题信息
-      otp_cert = :public_key.pkix_decode_cert(elem(decoded_cert, 1), :otp)
+      assert elem(otp_cert, 0) == :OTPCertificate
       assert otp_cert != nil
 
       # 清理

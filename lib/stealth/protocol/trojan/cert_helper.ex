@@ -24,24 +24,33 @@ defmodule Stealth.Protocol.Trojan.CertHelper do
   def generate_basic_cert do
     Logger.info("Generating basic SSL certificate...")
 
-    File.rm_rf(@key_file)
-    File.rm_rf(@cert_file)
+    # Ensure directory exists
+    File.mkdir_p!(@cert_dir)
 
-    case System.cmd("openssl", [
-           "req",
-           "-x509",
-           "-newkey",
-           "rsa:2048",
-           "-keyout",
-           @key_file,
-           "-out",
-           @cert_file,
-           "-days",
-           "365",
-           "-nodes",
-           "-subj",
-           "/CN=localhost"
-         ]) do
+    # Remove old files if they exist (use File.rm not File.rm_rf for files)
+    if File.exists?(@key_file), do: File.rm(@key_file)
+    if File.exists?(@cert_file), do: File.rm(@cert_file)
+
+    # Generate certificate
+    case System.cmd(
+           "openssl",
+           [
+             "req",
+             "-x509",
+             "-newkey",
+             "rsa:2048",
+             "-keyout",
+             @key_file,
+             "-out",
+             @cert_file,
+             "-days",
+             "365",
+             "-nodes",
+             "-subj",
+             "/CN=localhost"
+           ],
+           stderr_to_stdout: true
+         ) do
       {_out, 0} ->
         Logger.info("Basic SSL certificate generated successfully.")
 

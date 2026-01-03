@@ -39,8 +39,12 @@ defmodule Stealth.Protocol.Trojan.Worker do
   defp proxy_connection(client_socket, req) do
     with {:ok, req} <- Conn.resolve_remote_address(req),
          {:ok, req} <- Conn.filter_forbidden_addresses(req),
-         {:ok, %{remote: target_socket}} = Conn.tcp_connect_remote(req) do
+         {:ok, %{remote: target_socket}} <- Conn.tcp_connect_remote(req) do
       start_bidirectional_proxy(client_socket, target_socket)
+    else
+      {:error, reason} ->
+        Logger.error("Proxy connection failed: #{inspect(reason)}")
+        {:close, nil}
     end
   end
 
@@ -55,24 +59,13 @@ defmodule Stealth.Protocol.Trojan.Worker do
         proxy_data(target_socket, client_socket, "target->client")
       end)
 
-    case Task.yield_many([task1, task2], :infinity) do
-      {:ok, term} ->
-        Logger.info("Proxy connection successful: #{inspect(term)}")
-        Task.shutdown(task1, :brutal_kill)
-        Task.shutdown(task2, :brutal_kill)
+    # Task.yield_many returns a list of {task, result} tuples
+    results = Task.yield_many([task1, task2], :infinity)
 
-      {:exit, reason} ->
-        # 至少一个Task完成
-        Logger.info("Proxy connection closed: #{inspect(reason)}")
-        Task.shutdown(task1, :brutal_kill)
-        Task.shutdown(task2, :brutal_kill)
-
-      nil ->
-        # 超时情况
-        Logger.info("Proxy connection timeout")
-        Task.shutdown(task1, :brutal_kill)
-        Task.shutdown(task2, :brutal_kill)
-    end
+    # At least one task has finished (either normally or with exit)
+    Logger.debug("Proxy tasks finished: #{inspect(results)}")
+    Task.shutdown(task1, :brutal_kill)
+    Task.shutdown(task2, :brutal_kill)
 
     cleanup_sockets(client_socket, target_socket)
 
@@ -80,7 +73,16 @@ defmodule Stealth.Protocol.Trojan.Worker do
   end
 
   defp cleanup_sockets(client_socket, target_socket) do
-    :gen_tcp.close(client_socket)
+    # Close client socket (ThousandIsland.Socket)
+    case client_socket do
+      %ThousandIsland.Socket{} ->
+        ThousandIsland.Socket.close(client_socket)
+
+      _ ->
+        :gen_tcp.close(client_socket)
+    end
+
+    # Close target socket (regular gen_tcp socket)
     :gen_tcp.close(target_socket)
   end
 
@@ -94,7 +96,8 @@ defmodule Stealth.Protocol.Trojan.Worker do
 
           {:error, reason} ->
             Logger.debug("Write error #{direction}: #{inspect(reason)}")
-            exit(:write_error)
+            # Exit normally - connection errors are expected
+            exit(:normal)
         end
 
       {:ok, <<>>} ->
@@ -103,11 +106,13 @@ defmodule Stealth.Protocol.Trojan.Worker do
 
       {:error, :closed} ->
         Logger.debug("Connection closed #{direction}")
-        exit(:connection_closed)
+        # Exit normally - connection closed is expected
+        exit(:normal)
 
       {:error, reason} ->
         Logger.debug("Read error #{direction}: #{inspect(reason)}")
-        exit(:read_error)
+        # Exit normally - read errors during proxy are expected
+        exit(:normal)
     end
   end
 
