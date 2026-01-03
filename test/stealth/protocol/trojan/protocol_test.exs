@@ -4,6 +4,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
   require Logger
   alias Stealth.Protocol.Trojan.Protocol
 
+  # Mock span for testing
+  defmodule MockSpan do
+    defstruct span_metadata: %{}
+
+    def span_metadata(%__MODULE__{}), do: %{}
+  end
+
   describe "sha224_hash/1" do
     test "generates correct hash length" do
       password = "test_password_123"
@@ -218,7 +225,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
             transport_module: ThousandIsland.Transports.TCP,
             read_timeout: 5000,
             silent_terminate_on_error: false,
-            span: :undefined
+            span: %MockSpan{}
           }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
@@ -255,7 +262,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
             transport_module: ThousandIsland.Transports.TCP,
             read_timeout: 5000,
             silent_terminate_on_error: false,
-            span: :undefined
+            span: %MockSpan{}
           }
           result = Protocol.parse_request(wrapped_socket, wrong_password)
           :gen_tcp.close(socket)
@@ -302,7 +309,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
             transport_module: ThousandIsland.Transports.TCP,
             read_timeout: 5000,
             silent_terminate_on_error: false,
-            span: :undefined
+            span: %MockSpan{}
           }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
@@ -350,7 +357,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
             transport_module: ThousandIsland.Transports.TCP,
             read_timeout: 5000,
             silent_terminate_on_error: false,
-            span: :undefined
+            span: %MockSpan{}
           }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
@@ -385,7 +392,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
             transport_module: ThousandIsland.Transports.TCP,
             read_timeout: 5000,
             silent_terminate_on_error: false,
-            span: :undefined
+            span: %MockSpan{}
           }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)

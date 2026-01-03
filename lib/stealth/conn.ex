@@ -142,7 +142,7 @@ defmodule Stealth.Conn do
   def command_to_byte(:connect), do: @cmd_connect
   def command_to_byte(:bind), do: @cmd_bind
   def command_to_byte(:udp_associate), do: @cmd_udp_associate
-  def command_to_byte(_), do: @cmd_connect
+  def command_to_byte(_), do: nil
 
   @doc """
   Convert SOCKS5 command byte to command name.

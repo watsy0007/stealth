@@ -25,7 +25,6 @@ defmodule Stealth.Protocol.Trojan.Crypto do
   """
   def ssl_client_options(host, opts \\ []) do
     base_options = [
-      :binary,
       active: false,
       packet: 0,
       nodelay: true,
@@ -37,7 +36,7 @@ defmodule Stealth.Protocol.Trojan.Crypto do
       ]
     ]
 
-    Keyword.merge(base_options, opts)
+    [:binary | Keyword.merge(base_options, opts)]
   end
 
   @doc """
@@ -232,7 +231,7 @@ defmodule Stealth.Protocol.Trojan.Crypto do
 
   defp secure_cipher?(cipher) do
     # Filter out weak ciphers
-    cipher_name = :ssl.suite_to_str(cipher)
+    cipher_name = :ssl.suite_to_str(cipher) |> to_string()
 
     not (String.contains?(cipher_name, "DES") or
            String.contains?(cipher_name, "RC4") or
