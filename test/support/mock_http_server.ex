@@ -99,6 +99,7 @@ defmodule MockHTTPServer do
       String.contains?(data, "POST ") ->
         # POST request
         body = ~s({"status": "ok", "message": "POST received"})
+
         """
         HTTP/1.1 200 OK\r
         Content-Type: application/json\r
@@ -111,6 +112,7 @@ defmodule MockHTTPServer do
       String.contains?(data, "GET ") ->
         # GET request
         body = ~s({"status": "ok", "message": "Mock HTTP Server"})
+
         """
         HTTP/1.1 200 OK\r
         Content-Type: application/json\r
@@ -123,6 +125,7 @@ defmodule MockHTTPServer do
       true ->
         # Unknown request
         body = "Bad Request"
+
         """
         HTTP/1.1 400 Bad Request\r
         Content-Type: text/plain\r
