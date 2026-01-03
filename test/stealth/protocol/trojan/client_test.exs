@@ -380,7 +380,7 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           # 不发送数据，直接尝试接收（应该超时）
           result = Client.recv_data(socket, 0, 100)
 
-          assert {:error, :timeout} = result or match?({:error, _}, result)
+          assert result == {:error, :timeout} or match?({:error, _}, result)
 
           Client.close(socket)
 

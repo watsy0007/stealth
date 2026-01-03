@@ -44,28 +44,57 @@ defmodule Stealth.Conn do
       iex> Conn.parse_socks5_request(<<1, 127, 0, 0, 1, 0, 80, "payload">>)
       {:ok, %{req_type: :ipv4, addr: <<127, 0, 0, 1>>, port: 80, payload: "payload"}}
   """
-  def parse_socks5_request(data) do
-    case data do
-      # IPv4
-      <<@cmd_connect, @atyp_ipv4, addr::bytes-4, port::16, payload::bytes>> ->
-        {:ok, %{req_type: :ipv4, addr: addr, port: port, payload: payload}}
+  def parse_socks5_request(data) when byte_size(data) >= 2 do
+    <<first, second, _rest::binary>> = data
 
-      # Domain
-      <<@cmd_connect, @atyp_domain, len, addr::bytes-size(len), port::16, payload::bytes>> ->
+    # Check if we have CMD byte by looking at first two bytes
+    # If first byte is 1/2/3 (CMD) and second byte is 1/3/4 (ATYP), it's CMD format
+    # Otherwise, first byte is ATYP (legacy format)
+    if first in [1, 2, 3] and second in [1, 3, 4] do
+      parse_with_cmd(data)
+    else
+      parse_legacy(data)
+    end
+  end
+
+  def parse_socks5_request(data) do
+    # Less than 2 bytes, try legacy format
+    parse_legacy(data)
+  end
+
+  # Parse as CMD format (with CMD byte)
+  defp parse_with_cmd(data) do
+    case data do
+      # IPv4 with CMD byte
+      <<_cmd, 1, a, b, c, d, port::16, payload::binary>> ->
+        {:ok, %{req_type: :ipv4, addr: <<a, b, c, d>>, port: port, payload: payload}}
+
+      # Domain with CMD byte
+      <<_cmd, 3, len, addr::binary-size(len), port::16, payload::binary>> ->
         {:ok, %{req_type: :host, addr: addr, port: port, payload: payload}}
 
-      # IPv6
-      <<@cmd_connect, @atyp_ipv6, addr::bytes-16, port::16, payload::bytes>> ->
+      # IPv6 with CMD byte
+      <<_cmd, 4, addr::binary-size(16), port::16, payload::binary>> ->
         {:ok, %{req_type: :ipv6, addr: addr, port: port, payload: payload}}
 
-      # Legacy format without CMD byte (backward compatibility)
-      <<@atyp_ipv4, addr::bytes-4, port::16, payload::bytes>> ->
-        {:ok, %{req_type: :ipv4, addr: addr, port: port, payload: payload}}
+      _ ->
+        {:error, :invalid_request}
+    end
+  end
 
-      <<@atyp_domain, len, addr::bytes-size(len), port::16, payload::bytes>> ->
+  # Parse as legacy format (without CMD byte)
+  defp parse_legacy(data) do
+    case data do
+      # IPv4 legacy (ATYP=1)
+      <<1, a, b, c, d, port::16, payload::binary>> ->
+        {:ok, %{req_type: :ipv4, addr: <<a, b, c, d>>, port: port, payload: payload}}
+
+      # Domain legacy (ATYP=3)
+      <<3, len, addr::binary-size(len), port::16, payload::binary>> ->
         {:ok, %{req_type: :host, addr: addr, port: port, payload: payload}}
 
-      <<@atyp_ipv6, addr::bytes-16, port::16, payload::bytes>> ->
+      # IPv6 legacy (ATYP=4)
+      <<4, addr::binary-size(16), port::16, payload::binary>> ->
         {:ok, %{req_type: :ipv6, addr: addr, port: port, payload: payload}}
 
       _ ->

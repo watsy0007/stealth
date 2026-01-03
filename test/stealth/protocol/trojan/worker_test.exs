@@ -9,6 +9,9 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
   @timeout 10_000
 
   setup_all do
+    # Start the DNS cache for domain resolution
+    start_supervised!(Stealth.DNSCache)
+
     {:ok, cert_info} = CertHelper.setup_test_certificates()
 
     cfg = [
@@ -30,10 +33,17 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
     Logger.info("Starting Trojan worker test server on port #{cfg[:port]}...")
 
     case ThousandIsland.start_link(cfg) do
-      {:ok, pid} ->
+      {:ok, server_pid} ->
         Logger.info("Trojan worker test server started successfully.")
-        on_exit(fn -> GenServer.stop(pid) end)
-        {:ok, server_pid: pid, cert_info: cert_info}
+        on_exit(fn ->
+          # Stop the server with a timeout
+          try do
+            GenServer.stop(server_pid, :normal, 5000)
+          catch
+            :exit, _ -> :ok
+          end
+        end)
+        {:ok, server_pid: server_pid, cert_info: cert_info}
 
       {:error, reason} ->
         Logger.error("Failed to start Trojan worker test server: #{inspect(reason)}")

@@ -158,22 +158,50 @@ defmodule Stealth.Protocol.Trojan.Protocol do
   # Private functions
 
   defp read_initial_data(socket) do
-    # 读取足够的数据来解析协议头
-    # 最小长度：56(hash) + 2(CRLF) + 1(CMD) + 1(ATYP) + 1(addr_len) + 2(port) + 2(CRLF) = 65
-    case ThousandIsland.Socket.recv(socket, 65, 5000) do
-      {:ok, data} when byte_size(data) >= 65 ->
-        {:ok, data}
-
-      {:ok, data} ->
-        # 如果数据不足，尝试读取更多
-        case ThousandIsland.Socket.recv(socket, 100 - byte_size(data), 2000) do
-          {:ok, more_data} -> {:ok, data <> more_data}
-          error -> error
+    # Read hash + CRLF first (58 bytes) - use 3s timeout to allow Task.await to complete
+    with {:ok, hash_data} <- ThousandIsland.Socket.recv(socket, 58, 3000),
+         # Read CMD byte (1 byte)
+         {:ok, <<cmd>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         # Read ATYP byte (1 byte)
+         {:ok, <<atyp>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         # Read address based on ATYP
+         {:ok, addr_port_data} <- read_address_and_port(socket, atyp),
+         # Read trailing CRLF (2 bytes)
+         {:ok, @crlf} <- ThousandIsland.Socket.recv(socket, 2, 3000) do
+      # Try to read any payload data (recv 0 means read whatever is available)
+      payload =
+        case ThousandIsland.Socket.recv(socket, 0, 1000) do
+          {:ok, data} when byte_size(data) > 0 -> data
+          _ -> ""
         end
 
-      error ->
-        error
+      # Reconstruct the full data
+      socks5_addr = <<cmd, atyp>> <> addr_port_data
+      {:ok, hash_data <> socks5_addr <> @crlf <> payload}
     end
+  end
+
+  # Read address and port based on ATYP
+  defp read_address_and_port(socket, 0x01) do
+    # IPv4: 4 bytes address + 2 bytes port
+    ThousandIsland.Socket.recv(socket, 6, 3000)
+  end
+
+  defp read_address_and_port(socket, 0x03) do
+    # Domain: 1 byte length + N bytes domain + 2 bytes port
+    with {:ok, <<len>>} <- ThousandIsland.Socket.recv(socket, 1, 3000),
+         {:ok, domain_port} <- ThousandIsland.Socket.recv(socket, len + 2, 3000) do
+      {:ok, <<len>> <> domain_port}
+    end
+  end
+
+  defp read_address_and_port(socket, 0x04) do
+    # IPv6: 16 bytes address + 2 bytes port
+    ThousandIsland.Socket.recv(socket, 18, 3000)
+  end
+
+  defp read_address_and_port(_socket, _atyp) do
+    {:error, :invalid_atyp}
   end
 
   defp parse_protocol(data, passwd) do
