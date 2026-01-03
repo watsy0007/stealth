@@ -213,7 +213,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: :undefined
+          }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -244,7 +250,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: :undefined
+          }
           result = Protocol.parse_request(wrapped_socket, wrong_password)
           :gen_tcp.close(socket)
           result
@@ -285,7 +297,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: :undefined
+          }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -327,7 +345,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: :undefined
+          }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result
@@ -356,7 +380,13 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       task =
         Task.async(fn ->
           {:ok, socket} = :gen_tcp.accept(listen_socket)
-          wrapped_socket = %ThousandIsland.Socket{socket: socket}
+          wrapped_socket = %ThousandIsland.Socket{
+            socket: socket,
+            transport_module: ThousandIsland.Transports.TCP,
+            read_timeout: 5000,
+            silent_terminate_on_error: false,
+            span: :undefined
+          }
           result = Protocol.parse_request(wrapped_socket, hashed_password)
           :gen_tcp.close(socket)
           result

@@ -112,9 +112,13 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
-      iex> request = Protocol.sha224_hash("pass") <> "\\r\\n" <> "data"
-      iex> Protocol.extract_password_hash(request)
-      {:ok, hash, remaining_data}
+      iex> hash = Protocol.sha224_hash("pass")
+      iex> request = hash <> "\\r\\n" <> "data"
+      iex> {:ok, extracted_hash, remaining} = Protocol.extract_password_hash(request)
+      iex> extracted_hash == hash
+      true
+      iex> remaining
+      "data"
   """
   def extract_password_hash(data) when byte_size(data) >= 58 do
     case data do
