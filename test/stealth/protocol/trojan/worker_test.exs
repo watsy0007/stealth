@@ -35,6 +35,7 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
     case ThousandIsland.start_link(cfg) do
       {:ok, server_pid} ->
         Logger.info("Trojan worker test server started successfully.")
+
         on_exit(fn ->
           # Stop the server with a timeout
           try do
@@ -43,6 +44,7 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
             :exit, _ -> :ok
           end
         end)
+
         {:ok, server_pid: server_pid, cert_info: cert_info}
 
       {:error, reason} ->

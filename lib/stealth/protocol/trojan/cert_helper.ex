@@ -32,21 +32,23 @@ defmodule Stealth.Protocol.Trojan.CertHelper do
     if File.exists?(@cert_file), do: File.rm(@cert_file)
 
     # Generate certificate
-    case System.cmd("openssl", [
-           "req",
-           "-x509",
-           "-newkey",
-           "rsa:2048",
-           "-keyout",
-           @key_file,
-           "-out",
-           @cert_file,
-           "-days",
-           "365",
-           "-nodes",
-           "-subj",
-           "/CN=localhost"
-         ], stderr_to_stdout: true) do
+    case System.cmd(
+           "openssl",
+           [
+             "req",
+             "-x509",
+             "-newkey",
+             "rsa:2048",
+             "-keyout",
+             @key_file,
+             "-out",
+             @cert_file,
+             "-days",
+             "365",
+             "-nodes",
+             "-subj",
+             "/CN=localhost"
+           ], stderr_to_stdout: true) do
       {_out, 0} ->
         Logger.info("Basic SSL certificate generated successfully.")
 
