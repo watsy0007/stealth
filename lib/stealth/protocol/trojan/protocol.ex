@@ -56,11 +56,15 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
-      iex> Protocol.build_request("mypass", {192, 168, 1, 1}, 80)
-      {:ok, <<...>>}
+      iex> alias Stealth.Protocol.Trojan.Protocol
+      iex> {:ok, request} = Protocol.build_request("mypass", {192, 168, 1, 1}, 80)
+      iex> is_binary(request)
+      true
 
-      iex> Protocol.build_request("mypass", "example.com", 443, "GET / HTTP/1.1\\r\\n")
-      {:ok, <<...>>}
+      iex> alias Stealth.Protocol.Trojan.Protocol
+      iex> {:ok, request} = Protocol.build_request("mypass", "example.com", 443, "GET / HTTP/1.1\\r\\n")
+      iex> String.ends_with?(request, "GET / HTTP/1.1\\r\\n")
+      true
   """
   def build_request(password, address, port, payload \\ "", cmd \\ :connect) do
     with {:ok, hash} <- {:ok, sha224_hash(password)},
@@ -82,9 +86,11 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.build_socks5_address({192, 168, 1, 1}, 80)
       {:ok, <<1, 1, 192, 168, 1, 1, 0, 80>>}
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.build_socks5_address("example.com", 443)
       {:ok, <<1, 3, 11, "example.com", 1, 187>>}
   """
@@ -95,10 +101,12 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> hash = Protocol.sha224_hash("password")
       iex> Protocol.validate_password(hash, "password")
       true
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> Protocol.validate_password("invalid", "password")
       false
   """
@@ -112,6 +120,7 @@ defmodule Stealth.Protocol.Trojan.Protocol do
 
   ## Examples
 
+      iex> alias Stealth.Protocol.Trojan.Protocol
       iex> hash = Protocol.sha224_hash("pass")
       iex> request = hash <> "\\r\\n" <> "data"
       iex> {:ok, extracted_hash, remaining} = Protocol.extract_password_hash(request)
