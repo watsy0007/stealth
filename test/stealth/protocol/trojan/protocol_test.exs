@@ -241,7 +241,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
 
       assert {:ok, req} = result
       assert req.req_type == :ipv4
-      assert req.ip == {93, 184, 216, 34}
+      assert req.addr == <<93, 184, 216, 34>>
       assert req.port == 80
 
       :gen_tcp.close(client_socket)
@@ -370,7 +370,8 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       result = Task.await(task, 5000)
 
       assert {:ok, req} = result
-      assert req.payload == payload
+      # Payload includes the trailing CRLF from the protocol
+      assert req.payload == "\r\n" <> payload
       assert byte_size(req.payload) > 0
 
       :gen_tcp.close(client_socket)
