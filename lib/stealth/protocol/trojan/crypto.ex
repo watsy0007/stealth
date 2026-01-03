@@ -225,8 +225,8 @@ defmodule Stealth.Protocol.Trojan.Crypto do
 
   defp recommended_ciphers do
     # TLS 1.3 and 1.2 recommended cipher suites
-    :ssl.cipher_suites(:all, :"tlsv1.3") ++
-      :ssl.cipher_suites(:all, :"tlsv1.2")
+    (:ssl.cipher_suites(:all, :"tlsv1.3") ++
+       :ssl.cipher_suites(:all, :"tlsv1.2"))
     |> Enum.filter(&secure_cipher?/1)
   end
 

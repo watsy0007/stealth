@@ -6,8 +6,8 @@ defmodule Stealth.Protocol.Shadowsocks.Router do
 
   use Plug.Router
 
-  plug :match
-  plug :dispatch
+  plug(:match)
+  plug(:dispatch)
 
   def init(opts), do: opts
 

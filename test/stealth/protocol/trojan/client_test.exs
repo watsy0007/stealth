@@ -187,7 +187,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           headers = [{"Content-Type", "application/json"}]
           body = ~s({"test": "data"})
 
-          result = Client.http_proxy_request(socket, "POST", "/post", "httpbin.org", headers, body)
+          result =
+            Client.http_proxy_request(socket, "POST", "/post", "httpbin.org", headers, body)
 
           case result do
             {:ok, _response} -> :ok

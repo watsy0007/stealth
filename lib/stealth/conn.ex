@@ -103,7 +103,9 @@ defmodule Stealth.Conn do
   def build_socks5_address({a, b, c, d, e, f, g, h}, port, cmd)
       when is_integer(port) and port >= 0 and port <= 65535 do
     cmd_byte = command_to_byte(cmd)
-    {:ok, <<cmd_byte, @atyp_ipv6, a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16, port::16>>}
+
+    {:ok,
+     <<cmd_byte, @atyp_ipv6, a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16, port::16>>}
   end
 
   # Domain name

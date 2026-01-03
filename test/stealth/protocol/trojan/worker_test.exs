@@ -87,17 +87,17 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
       # 构造带错误密码的请求
       wrong_hash = Protocol.sha224_hash("wrong_password")
 
+      # CONNECT
+      # IPv4
+      # localhost
+      # Port 80
       request =
         wrong_hash <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x01>> <>
-          # IPv4
           <<127, 0, 0, 1>> <>
-          # localhost
           <<0, 80>> <>
-          # Port 80
           "\r\n"
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -122,17 +122,17 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
       # 构造有效的 Trojan 请求
       hash = Protocol.sha224_hash(@test_password)
 
+      # CONNECT
+      # IPv4
+      # example.com IP
+      # Port 80
       request =
         hash <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x01>> <>
-          # IPv4
           <<93, 184, 216, 34>> <>
-          # example.com IP
           <<0, 80>> <>
-          # Port 80
           "\r\n"
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -155,17 +155,17 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
       hash = Protocol.sha224_hash(@test_password)
       domain = "example.com"
 
+      # CONNECT
+      # Domain
+      # Port 80
       request =
         hash <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x03>> <>
-          # Domain
           <<byte_size(domain)>> <>
           domain <>
           <<0, 80>> <>
-          # Port 80
           "\r\n"
 
       assert :ok = :ssl.send(ssl_socket, request)
@@ -187,16 +187,16 @@ defmodule Stealth.Protocol.Trojan.WorkerTest do
       hash = Protocol.sha224_hash(@test_password)
       http_request = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
 
+      # CONNECT
+      # IPv4
+      # Port 80
       request =
         hash <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x01>> <>
-          # IPv4
           <<93, 184, 216, 34>> <>
           <<0, 80>> <>
-          # Port 80
           "\r\n" <> http_request
 
       assert :ok = :ssl.send(ssl_socket, request)

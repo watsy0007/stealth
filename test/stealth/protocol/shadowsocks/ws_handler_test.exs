@@ -9,14 +9,14 @@ defmodule Stealth.Protocol.Shadowsocks.WSHandlerTest do
     end
 
     test "initializes with cipher", %{cipher: cipher} do
-      {:ok, state} = WSHandler.init([cipher: cipher])
+      {:ok, state} = WSHandler.init(cipher: cipher)
       assert state.cipher == cipher
       assert state.state == :initial
       assert state.remote == nil
     end
 
     test "handles binary frame in initial state", %{cipher: cipher} do
-      {:ok, state} = WSHandler.init([cipher: cipher])
+      {:ok, state} = WSHandler.init(cipher: cipher)
 
       # This would fail without a proper handshake, but we're testing the structure
       result = WSHandler.handle_in({<<1, 2, 3>>, opcode: :binary}, state)
@@ -26,7 +26,7 @@ defmodule Stealth.Protocol.Shadowsocks.WSHandlerTest do
     end
 
     test "ignores non-binary frames", %{cipher: cipher} do
-      {:ok, state} = WSHandler.init([cipher: cipher])
+      {:ok, state} = WSHandler.init(cipher: cipher)
 
       {:ok, new_state} = WSHandler.handle_in({~s({"test": "data"}), opcode: :text}, state)
 
@@ -38,7 +38,7 @@ defmodule Stealth.Protocol.Shadowsocks.WSHandlerTest do
   describe "WebSocket handler termination" do
     test "terminates cleanly" do
       {:ok, cipher} = Cipher.setup(:aes_256_gcm, "test-password")
-      {:ok, state} = WSHandler.init([cipher: cipher])
+      {:ok, state} = WSHandler.init(cipher: cipher)
 
       result = WSHandler.terminate(:normal, state)
       assert result == :ok

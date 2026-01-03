@@ -15,16 +15,15 @@ defmodule Stealth.Application do
         opts = Application.get_env(:stealth, :ss)
 
         # TCP worker
-        tcp_worker = {Task, fn -> Shadowsocks.Worker.start(opts[:port], opts[:method], opts[:passwd]) end}
+        tcp_worker =
+          {Task, fn -> Shadowsocks.Worker.start(opts[:port], opts[:method], opts[:passwd]) end}
 
         # WebSocket server (if enabled)
         ws_server =
           if opts[:ws_enabled] do
             {:ok, cipher} = Shadowsocks.Cipher.setup(opts[:method], opts[:passwd])
 
-            {Bandit,
-             port: opts[:ws_port],
-             plug: {Shadowsocks.Router, cipher: cipher}}
+            {Bandit, port: opts[:ws_port], plug: {Shadowsocks.Router, cipher: cipher}}
           else
             nil
           end

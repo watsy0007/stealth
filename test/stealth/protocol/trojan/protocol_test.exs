@@ -185,17 +185,17 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
 
       # 构造有效的 Trojan 请求
       # 格式: hash + CRLF + CMD(0x01) + ATYP(0x01) + IPv4(4字节) + Port(2字节) + CRLF
+      # CONNECT
+      # IPv4
+      # example.com IP
+      # Port 80
       valid_request =
         hashed_password <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x01>> <>
-          # IPv4
           <<93, 184, 216, 34>> <>
-          # example.com IP
           <<0, 80>> <>
-          # Port 80
           "\r\n"
 
       {:ok, password: password, hashed_password: hashed_password, valid_request: valid_request}
@@ -266,17 +266,17 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       # 格式: hash + CRLF + CMD(0x01) + ATYP(0x03) + LEN(1字节) + domain + Port(2字节) + CRLF
       domain = "example.com"
 
+      # CONNECT
+      # Domain
+      # Port 80
       domain_request =
         hashed_password <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x03>> <>
-          # Domain
           <<byte_size(domain)>> <>
           domain <>
           <<0, 80>> <>
-          # Port 80
           "\r\n"
 
       {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
@@ -309,16 +309,16 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
       # 构造带初始载荷的请求
       payload = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
 
+      # CONNECT
+      # IPv4
+      # Port 80
       request_with_payload =
         hashed_password <>
           "\r\n" <>
           <<0x01>> <>
-          # CONNECT
           <<0x01>> <>
-          # IPv4
           <<93, 184, 216, 34>> <>
           <<0, 80>> <>
-          # Port 80
           "\r\n" <> payload
 
       {:ok, listen_socket} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
