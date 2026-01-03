@@ -21,7 +21,7 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
       handler_module: Worker,
       handler_options: [
         passwd: @test_password,
-        server: [host: "httpbin.org", port: 80]
+        server: [host: "localhost", port: 18080]
       ],
       num_acceptors: 5
     ]
@@ -44,8 +44,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           "localhost",
           @test_port,
           @test_password,
-          "example.com",
-          80,
+          "localhost",
+          18080,
           verify: :verify_none
         )
 
@@ -66,8 +66,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           "localhost",
           @test_port,
           "wrong_password",
-          "example.com",
-          80,
+          "localhost",
+          18080,
           verify: :verify_none
         )
 
@@ -80,15 +80,15 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
     end
 
     test "supports initial payload" do
-      initial_payload = "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"
+      initial_payload = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"
 
       result =
         Client.connect(
           "localhost",
           @test_port,
           @test_password,
-          "example.com",
-          80,
+          "localhost",
+          18080,
           verify: :verify_none,
           initial_payload: initial_payload
         )
@@ -105,8 +105,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           "nonexistent.invalid.test",
           443,
           @test_password,
-          "example.com",
-          80,
+          "localhost",
+          18080,
           verify: :verify_none
         )
 
@@ -120,8 +120,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "example.com",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
@@ -149,12 +149,12 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "httpbin.org",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
-          result = Client.http_proxy_request(socket, "GET", "/", "httpbin.org")
+          result = Client.http_proxy_request(socket, "GET", "/", "localhost")
 
           case result do
             {:ok, response} ->
@@ -179,8 +179,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "httpbin.org",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
@@ -188,7 +188,7 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
           body = ~s({"test": "data"})
 
           result =
-            Client.http_proxy_request(socket, "POST", "/post", "httpbin.org", headers, body)
+            Client.http_proxy_request(socket, "POST", "/post", "localhost", headers, body)
 
           case result do
             {:ok, _response} -> :ok
@@ -209,8 +209,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "example.com",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
@@ -302,8 +302,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "example.com",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
@@ -330,8 +330,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
                    "localhost",
                    @test_port,
                    @test_password,
-                   "example.com",
-                   80,
+                   "localhost",
+                   18080,
                    verify: :verify_none
                  ) do
               {:ok, socket} ->
@@ -355,8 +355,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "example.com",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->
@@ -372,8 +372,8 @@ defmodule Stealth.Protocol.Trojan.ClientTest do
              "localhost",
              @test_port,
              @test_password,
-             "example.com",
-             80,
+             "localhost",
+             18080,
              verify: :verify_none
            ) do
         {:ok, socket} ->

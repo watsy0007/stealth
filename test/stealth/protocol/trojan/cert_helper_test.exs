@@ -109,6 +109,8 @@ defmodule Stealth.Protocol.Trojan.CertHelperTest do
 
     test "raises when certificate file is missing" do
       cert_dir = "priv/ssl"
+      # 清理并创建新目录
+      File.rm_rf(cert_dir)
       File.mkdir_p!(cert_dir)
 
       # 只创建 key 文件，不创建 cert 文件
@@ -125,6 +127,8 @@ defmodule Stealth.Protocol.Trojan.CertHelperTest do
 
     test "raises when key file is missing" do
       cert_dir = "priv/ssl"
+      # 清理并创建新目录
+      File.rm_rf(cert_dir)
       File.mkdir_p!(cert_dir)
 
       # 只创建 cert 文件，不创建 key 文件
