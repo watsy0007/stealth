@@ -37,64 +37,51 @@ defmodule Stealth.Conn do
   @doc """
   Parse SOCKS5 request from binary data.
 
-  Returns a map with request type, address, port, and payload.
+  Supports two formats:
+  - Standard SOCKS5: ATYP + ADDRESS + PORT + PAYLOAD
+  - CMD-prefixed: CMD + ATYP + ADDRESS + PORT + PAYLOAD
+
+  Returns a map with request type, address, port, and optional CMD.
 
   ## Examples
 
       iex> Conn.parse_socks5_request(<<1, 127, 0, 0, 1, 0, 80, "payload">>)
       {:ok, %{req_type: :ipv4, addr: <<127, 0, 0, 1>>, port: 80, payload: "payload"}}
+
+      iex> Conn.parse_socks5_request(<<1, 1, 127, 0, 0, 1, 0, 80, "payload">>)
+      {:ok, %{cmd: :connect, req_type: :ipv4, addr: <<127, 0, 0, 1>>, port: 80, payload: "payload"}}
   """
   def parse_socks5_request(data) when byte_size(data) >= 2 do
     <<first, second, _rest::binary>> = data
 
-    # Check if we have CMD byte by looking at first two bytes
-    # If first byte is 1/2/3 (CMD) and second byte is 1/3/4 (ATYP), it's CMD format
-    # Otherwise, first byte is ATYP (legacy format)
-    if first in [1, 2, 3] and second in [1, 3, 4] do
-      parse_with_cmd(data)
+    # Auto-detect format: If first byte is valid CMD (1/2/3) and second is valid ATYP (1/3/4),
+    # assume CMD-prefixed format. Otherwise, assume standard SOCKS5 format.
+    if first in [@cmd_connect, @cmd_bind, @cmd_udp_associate] and
+         second in [@atyp_ipv4, @atyp_domain, @atyp_ipv6] do
+      with {:ok, result} <- do_parse_socks5(data, 1) do
+        {:ok, Map.put(result, :cmd, byte_to_command(first))}
+      end
     else
-      parse_legacy(data)
+      do_parse_socks5(data, 0)
     end
   end
 
-  def parse_socks5_request(data) do
-    # Less than 2 bytes, try legacy format
-    parse_legacy(data)
-  end
+  def parse_socks5_request(data), do: do_parse_socks5(data, 0)
 
-  # Parse as CMD format (with CMD byte)
-  defp parse_with_cmd(data) do
+  # Unified SOCKS5 parsing with configurable offset for optional CMD byte
+  defp do_parse_socks5(data, offset) do
     case data do
-      # IPv4 with CMD byte
-      <<_cmd, 1, a, b, c, d, port::16, payload::binary>> ->
+      # IPv4: ATYP(1) + 4 bytes + port(2) + payload
+      <<_::binary-size(offset), @atyp_ipv4, a, b, c, d, port::16, payload::binary>> ->
         {:ok, %{req_type: :ipv4, addr: <<a, b, c, d>>, port: port, payload: payload}}
 
-      # Domain with CMD byte
-      <<_cmd, 3, len, addr::binary-size(len), port::16, payload::binary>> ->
+      # Domain: ATYP(3) + length(1) + domain + port(2) + payload
+      <<_::binary-size(offset), @atyp_domain, len, addr::binary-size(len), port::16,
+        payload::binary>> ->
         {:ok, %{req_type: :host, addr: addr, port: port, payload: payload}}
 
-      # IPv6 with CMD byte
-      <<_cmd, 4, addr::binary-size(16), port::16, payload::binary>> ->
-        {:ok, %{req_type: :ipv6, addr: addr, port: port, payload: payload}}
-
-      _ ->
-        {:error, :invalid_request}
-    end
-  end
-
-  # Parse as legacy format (without CMD byte)
-  defp parse_legacy(data) do
-    case data do
-      # IPv4 legacy (ATYP=1)
-      <<1, a, b, c, d, port::16, payload::binary>> ->
-        {:ok, %{req_type: :ipv4, addr: <<a, b, c, d>>, port: port, payload: payload}}
-
-      # Domain legacy (ATYP=3)
-      <<3, len, addr::binary-size(len), port::16, payload::binary>> ->
-        {:ok, %{req_type: :host, addr: addr, port: port, payload: payload}}
-
-      # IPv6 legacy (ATYP=4)
-      <<4, addr::binary-size(16), port::16, payload::binary>> ->
+      # IPv6: ATYP(4) + 16 bytes + port(2) + payload
+      <<_::binary-size(offset), @atyp_ipv6, addr::binary-size(16), port::16, payload::binary>> ->
         {:ok, %{req_type: :ipv6, addr: addr, port: port, payload: payload}}
 
       _ ->
@@ -181,40 +168,46 @@ defmodule Stealth.Conn do
   def byte_to_command(@cmd_udp_associate), do: :udp_associate
   def byte_to_command(_), do: :unknown
 
+  @doc """
+  Resolve address to IP tuple for connection.
+
+  - :host type: Perform DNS lookup via cache
+  - :ipv4 type: Convert 4-byte binary to tuple
+  - :ipv6 type: Convert 16-byte binary to tuple
+  """
   def resolve_remote_address(%{req_type: :host, addr: addr} = req) do
     case DNSCache.fetch(addr) do
-      {:ok, ip} ->
-        {:ok, req |> Map.put(:ip, ip)}
-
-      {status, reason} when status in [:ignore, :error] ->
-        {:error, reason}
+      {:ok, ip} -> {:ok, Map.put(req, :ip, ip)}
+      {status, reason} when status in [:ignore, :error] -> {:error, reason}
     end
   end
 
   def resolve_remote_address(%{req_type: :ipv4, addr: addr} = req) do
-    ip =
-      addr
-      |> :binary.bin_to_list()
-      |> List.to_tuple()
-
-    {:ok, req |> Map.put(:ip, ip)}
+    ip = addr |> :binary.bin_to_list() |> List.to_tuple()
+    {:ok, Map.put(req, :ip, ip)}
   end
 
   def resolve_remote_address(%{req_type: :ipv6, addr: addr} = req) do
     ip =
-      for <<group::16 <- addr>> do
-        group
-      end
-      # { x, x, x, x, x, x, x, x } representation
+      for(<<group::16 <- addr>>, do: group)
       |> List.to_tuple()
-      # ::xx:xx:xx representation, :gen_tcp.connect only takes this one
       |> :inet.ntoa()
 
-    {:ok, req |> Map.put(:ip, ip)}
+    {:ok, Map.put(req, :ip, ip)}
   end
 
   def resolve_remote_address(_), do: {:error, :invalid_request}
 
+  @doc """
+  Filter forbidden addresses in production environment.
+
+  Blocks private IP ranges:
+  - 192.168.x.x, 10.x.x.x, 172.16-31.x.x (RFC 1918)
+  - 127.0.0.x (loopback)
+  - 0.x.x.x (invalid)
+
+  In dev/test mode, all addresses are allowed.
+  """
   if Mix.env() == :prod do
     def filter_forbidden_addresses(%{ip: ip} = req) do
       case ip do
@@ -230,37 +223,45 @@ defmodule Stealth.Conn do
     def filter_forbidden_addresses(req), do: {:ok, req}
   end
 
-  def tcp_send_request(%{remote: r, payload: payload} = req) when byte_size(payload) > 0 do
-    case :gen_tcp.send(r, payload) do
+  @doc """
+  Send initial payload to remote server if present.
+  """
+  def tcp_send_request(%{remote: remote, payload: payload} = req)
+      when byte_size(payload) > 0 do
+    case :gen_tcp.send(remote, payload) do
       :ok -> {:ok, req}
-      {:error, _} -> {:error, :invalid_conn}
+      {:error, _reason} -> {:error, :invalid_conn}
     end
   end
 
   def tcp_send_request(%{payload: payload} = req) when byte_size(payload) == 0, do: {:ok, req}
   def tcp_send_request(_), do: {:error, :invalid_conn}
 
+  @doc """
+  Connect to remote server with retry logic.
+  """
+
   def tcp_connect_remote(req), do: tcp_connect_remote(req, @socket_option, @tcp_retry)
 
-  def tcp_connect_remote(%{ip: r, port: port} = req, opts, retry) when retry > 1 do
-    case :gen_tcp.connect(r, port, opts) do
+  def tcp_connect_remote(%{ip: ip, port: port} = req, opts, retry) when retry > 1 do
+    case :gen_tcp.connect(ip, port, opts) do
       {:ok, client} ->
-        {:ok, req |> Map.put(:remote, client)}
+        {:ok, Map.put(req, :remote, client)}
 
-      {:error, _} ->
-        Logger.debug("retrying! #{inspect(r)}:#{port}")
+      {:error, _reason} ->
+        Logger.debug("Retrying connection to #{inspect(ip)}:#{port}")
         :timer.sleep(10)
-        tcp_connect_remote(req, port, opts, retry - 1)
+        tcp_connect_remote(req, opts, retry - 1)
     end
   end
 
-  def tcp_connect_remote(%{ip: r, port: port} = req, port, opts, 1) do
-    case :gen_tcp.connect(r, port, opts) do
+  def tcp_connect_remote(%{ip: ip, port: port} = req, opts, 1) do
+    case :gen_tcp.connect(ip, port, opts) do
       {:ok, client} ->
-        {:ok, req |> Map.put(:remote, client)}
+        {:ok, Map.put(req, :remote, client)}
 
       {:error, reason} ->
-        Logger.debug("Error connecting to #{inspect(req.addr)}:#{port} :: #{reason}")
+        Logger.debug("Failed to connect to #{inspect(req.addr)}:#{port} - #{reason}")
         {:error, reason}
     end
   end
