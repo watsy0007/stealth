@@ -7,7 +7,8 @@ defmodule Stealth.Protocol.Trojan.CryptoTest do
     test "generates default client options" do
       opts = Crypto.ssl_client_options("example.com")
 
-      assert Keyword.keyword?(opts)
+      assert is_list(opts)
+      assert :binary in opts
       assert Keyword.get(opts, :verify) == :verify_peer
       assert Keyword.get(opts, :server_name_indication) == ~c"example.com"
       assert Keyword.has_key?(opts, :cacerts)

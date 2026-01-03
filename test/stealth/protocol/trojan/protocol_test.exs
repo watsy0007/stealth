@@ -6,7 +6,7 @@ defmodule Stealth.Protocol.Trojan.ProtocolTest do
 
   # Mock span for testing
   defmodule MockSpan do
-    defstruct span_metadata: %{}
+    defstruct span_name: :test_span, span_metadata: %{}
 
     def span_metadata(%__MODULE__{}), do: %{}
   end

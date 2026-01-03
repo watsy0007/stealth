@@ -111,7 +111,7 @@ defmodule Stealth.ConnTest do
       assert Conn.command_to_byte(:connect) == 0x01
       assert Conn.command_to_byte(:bind) == 0x02
       assert Conn.command_to_byte(:udp_associate) == 0x03
-      assert Conn.command_to_byte(:unknown) == 0x01
+      assert Conn.command_to_byte(:unknown) == nil
     end
 
     test "converts command byte to name" do
