@@ -48,7 +48,8 @@ defmodule Stealth.MixProject do
       {:thousand_island, "~> 1.3"},
       {:bandit, "~> 1.10"},
       {:websock_adapter, "~> 0.5"},
-      {:plug, "~> 1.14"}
+      {:plug, "~> 1.14"},
+      {:yaml_elixir, "~> 2.9"}
     ]
   end
 end

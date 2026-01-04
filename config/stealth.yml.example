@@ -1,0 +1,108 @@
+# Stealth Proxy Server Configuration
+#
+# This is an example YAML configuration file for Stealth.
+# Copy this file to stealth.yml and modify as needed.
+#
+# To use this configuration:
+# 1. Copy: cp config/stealth.yml.example config/stealth.yml
+# 2. Edit: vim config/stealth.yml
+# 3. Run: mix run (or use CONFIG_FILE env var to specify custom path)
+#
+# Note: YAML configuration takes precedence over environment variables.
+
+# =============================================================================
+# Shadowsocks Configuration
+# =============================================================================
+shadowsocks:
+  # Enable Shadowsocks protocol (default: true)
+  enabled: true
+
+  # TCP port for Shadowsocks server (default: 8088)
+  port: 8088
+
+  # Shared password for authentication
+  # IMPORTANT: Change this to a strong password in production!
+  password: "hello-world"
+
+  # Encryption method (supported: aes_128_gcm, aes_256_gcm)
+  method: "aes_256_gcm"
+
+  # WebSocket configuration for firewall traversal
+  websocket:
+    # Enable WebSocket transport (default: true)
+    enabled: true
+
+    # WebSocket server port (default: 8089)
+    port: 8089
+
+# =============================================================================
+# Trojan Configuration
+# =============================================================================
+trojan:
+  # Enable Trojan protocol (default: false)
+  # Trojan uses TLS to disguise traffic as HTTPS
+  enabled: false
+
+  # SSL/TLS port (default: 443)
+  # Uses standard HTTPS port to blend with normal traffic
+  port: 443
+
+  # Shared password for authentication
+  # IMPORTANT: Change this to a strong password in production!
+  password: "hello-world"
+
+  # Fallback HTTP server for traffic masquerading
+  # When invalid Trojan requests are received, forward to this server
+  # This makes the proxy appear as a normal HTTPS website
+  mask_host: "example.com"
+  mask_port: 443
+
+  # SSL/TLS certificate files (optional for development)
+  # If not specified, self-signed certificates will be generated
+  # For production, use valid certificates from Let's Encrypt or similar
+  certfile: "/path/to/certificate.pem"
+  keyfile: "/path/to/private-key.pem"
+
+# =============================================================================
+# Example Configurations
+# =============================================================================
+
+# Example 1: Shadowsocks only (default)
+# shadowsocks:
+#   enabled: true
+#   port: 8088
+#   password: "my-secure-password-123"
+#   method: "aes_256_gcm"
+#   websocket:
+#     enabled: true
+#     port: 8089
+# trojan:
+#   enabled: false
+
+# Example 2: Trojan only
+# shadowsocks:
+#   enabled: false
+# trojan:
+#   enabled: true
+#   port: 443
+#   password: "my-trojan-password"
+#   mask_host: "www.bing.com"
+#   mask_port: 443
+#   certfile: "/etc/letsencrypt/live/mydomain.com/fullchain.pem"
+#   keyfile: "/etc/letsencrypt/live/mydomain.com/privkey.pem"
+
+# Example 3: Both protocols enabled
+# shadowsocks:
+#   enabled: true
+#   port: 8088
+#   password: "ss-password"
+#   method: "aes_256_gcm"
+#   websocket:
+#     enabled: true
+#     port: 8089
+# trojan:
+#   enabled: true
+#   port: 443
+#   password: "trojan-password"
+#   mask_host: "www.google.com"
+#   mask_port: 443
