@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for Stealth
 
-> Last updated: 2026-01-02
+> Last updated: 2026-01-04
 > Version: 0.9.5
 
 ## Project Overview
@@ -25,6 +25,7 @@
 │   ├── application.ex          # OTP application supervisor
 │   ├── conn.ex                 # SOCKS5 parsing & TCP utilities
 │   ├── dns_cache.ex            # DNS caching with 120s TTL
+│   ├── config_loader.ex        # YAML configuration loader
 │   └── protocol/
 │       ├── shadowsocks/
 │       │   ├── protocol.ex     # Protocol parsing utilities
@@ -39,12 +40,15 @@
 │           └── cert_helper.ex  # SSL certificate management
 ├── config/
 │   ├── config.exs              # Build-time defaults
-│   ├── runtime.exs             # Runtime env vars (MAIN CONFIG)
+│   ├── runtime.exs             # Runtime configuration loader (YAML or env vars)
+│   ├── stealth.yml.example     # Example YAML configuration
 │   ├── dev.exs                 # Development overrides
 │   ├── test.exs                # Test environment
 │   └── prod.exs                # Production settings
 ├── test/                       # ExUnit tests
 ├── mix.exs                     # Mix project configuration
+├── CONFIG.md                   # Configuration guide
+├── CLAUDE.md                   # AI assistant documentation (this file)
 ├── Dockerfile                  # Multi-stage production build
 └── .github/workflows/hub.yml   # CI/CD for Docker Hub
 ```
@@ -56,6 +60,7 @@
 | `Stealth.Application` | `application.ex:1` | Supervisor setup; conditionally starts Shadowsocks TCP worker, WebSocket server, and/or Trojan SSL server based on config |
 | `Stealth.Conn` | `conn.ex:1` | SOCKS5 request parsing (IPv4/IPv6/hostname), DNS resolution, private IP filtering (prod only), TCP connection management with retry logic |
 | `Stealth.DNSCache` | `dns_cache.ex:1` | In-memory DNS caching using Cachex; 120-second TTL to prevent DNS storms |
+| `Stealth.ConfigLoader` | `config_loader.ex:1` | YAML configuration file parser and loader; reads config from `config/stealth.yml` or `CONFIG_FILE` env var, applies to Application config |
 | `Stealth.Protocol.Shadowsocks.Worker` | `protocol/shadowsocks/worker.ex:1` | Accepts TCP connections, handles AEAD encryption/decryption handshake, manages bidirectional proxy via recursive receive loop |
 | `Stealth.Protocol.Shadowsocks.Cipher` | `protocol/shadowsocks/cipher.ex:1` | AEAD cipher state machine; manages nonce counter and encoder/decoder contexts for AES-128-GCM and AES-256-GCM |
 | `Stealth.Protocol.Shadowsocks.HKDF` | `protocol/shadowsocks/hkdf.ex:1` | RFC 5869 HMAC-based key derivation; derives sub-keys from password and salt |
@@ -106,7 +111,60 @@
 
 ## Configuration
 
-### Environment Variables (runtime.exs)
+Stealth supports two configuration methods:
+
+1. **YAML Configuration** (Recommended) - Structured, easy to maintain
+2. **Environment Variables** (Legacy) - Backward compatible
+
+See [CONFIG.md](/home/user/stealth/CONFIG.md) for comprehensive configuration guide.
+
+### YAML Configuration (Recommended)
+
+**Location**: `config/stealth.yml` or path specified by `CONFIG_FILE` environment variable
+
+**Example Configuration**:
+```yaml
+shadowsocks:
+  enabled: true
+  port: 8088
+  password: "hello-world"
+  method: "aes_256_gcm"
+  websocket:
+    enabled: true
+    port: 8089
+
+trojan:
+  enabled: false
+  port: 443
+  password: "hello-world"
+  mask_host: "example.com"
+  mask_port: 443
+  certfile: "/path/to/cert.pem"
+  keyfile: "/path/to/key.pem"
+```
+
+**Quick Start**:
+```bash
+# Copy example config
+cp config/stealth.yml.example config/stealth.yml
+
+# Edit configuration
+vim config/stealth.yml
+
+# Run with YAML config
+mix run --no-halt
+```
+
+**Custom Config File Location**:
+```bash
+# Use custom config file
+export CONFIG_FILE=/etc/stealth/custom.yml
+./bin/stealth start
+```
+
+### Environment Variables (Legacy)
+
+**Note**: YAML configuration takes precedence if present.
 
 **Shadowsocks Configuration**:
 ```bash
@@ -127,10 +185,15 @@ TROJAN_MASK_HOST=              # Fallback HTTP server host (e.g., example.com)
 TROJAN_MASK_PORT=443           # Fallback HTTP server port
 ```
 
-**Configuration Priority**:
-1. `config/runtime.exs` - Environment variables (highest priority)
-2. `config/{env}.exs` - Environment-specific overrides
-3. `config/config.exs` - Build-time defaults (lowest priority)
+### Configuration Priority
+
+Configuration loading priority (highest to lowest):
+
+1. **YAML Configuration** - If exists at `CONFIG_FILE` or `config/stealth.yml` (highest priority)
+2. **Environment Variables** - Falls back if no YAML file found
+3. **Default Values** - Built-in defaults (lowest priority)
+
+**Implementation**: `config/runtime.exs:6` attempts YAML loading via `Stealth.ConfigLoader.apply_yaml_config/0`, then falls back to environment variables if YAML config not found.
 
 ## Development Workflow
 
@@ -329,6 +392,7 @@ In production (`Mix.env() == :prod`), the following addresses are blocked:
 | `websock_adapter` | ~0.5 | WebSocket upgrade handler for Bandit |
 | `plug` | ~1.14 | HTTP routing (Shadowsocks WebSocket router) |
 | `cachex` | ~4.0 | Distributed cache (DNS caching with TTL) |
+| `yaml_elixir` | ~2.9 | YAML file parsing (configuration loading) |
 
 **Built-in OTP Apps**:
 - `:crypto` - AES-GCM, SHA-224, HMAC, MD5 hashing
@@ -446,10 +510,13 @@ Logger.configure(level: :debug)
 - **Main entry point**: `lib/stealth/application.ex:1`
 - **SOCKS5 parsing**: `lib/stealth/conn.ex:20`
 - **DNS caching**: `lib/stealth/dns_cache.ex:1`
+- **YAML config loader**: `lib/stealth/config_loader.ex:1`
 - **Shadowsocks TCP**: `lib/stealth/protocol/shadowsocks/worker.ex:1`
 - **Shadowsocks WebSocket**: `lib/stealth/protocol/shadowsocks/ws_handler.ex:1`
 - **Trojan handler**: `lib/stealth/protocol/trojan/worker.ex:1`
-- **Configuration**: `config/runtime.exs:1`
+- **Configuration loader**: `config/runtime.exs:6`
+- **Example YAML config**: `config/stealth.yml.example:1`
+- **Configuration guide**: `CONFIG.md:1`
 - **Build config**: `mix.exs:1`
 - **Docker build**: `Dockerfile:1`
 - **CI/CD**: `.github/workflows/hub.yml:1`
@@ -463,6 +530,6 @@ Logger.configure(level: :debug)
 
 ---
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2026-01-04
 **Maintainer**: watsy0007
 **Purpose**: AI assistant guidance for understanding and modifying the Stealth proxy server codebase
